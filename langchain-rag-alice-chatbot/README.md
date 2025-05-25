@@ -1,6 +1,8 @@
-# LangChain RAG Chatbot with OpenAI + ChromaDB
+# 💬 LangChain RAG Chatbot con OpenAI, ChromaDB, FastAPI y React
 
-Este proyecto es una implementación práctica de un sistema **RAG** (Retrieval-Augmented Generation) utilizando **LangChain**, **ChromaDB** y **OpenAI**. Permite consultar documentos locales (en este caso, un `.md` del libro *Alice in Wonderland*) usando lenguaje natural, y obtener respuestas generadas por una IA con base en el contenido real.
+Este proyecto es una implementación completa de un sistema **RAG** (Retrieval-Augmented Generation) con **LangChain** en el backend y una interfaz moderna en **React** como frontend.
+
+Permite consultar tus propios documentos (en este caso, *Alice in Wonderland* en formato `.md`) usando lenguaje natural, y obtener respuestas generadas por IA basadas en contexto real.
 
 ---
 
@@ -8,202 +10,128 @@ Este proyecto es una implementación práctica de un sistema **RAG** (Retrieval-
 
 RAG combina:
 
-- 🔍 Recuperación de información (vector search): busca los fragmentos más relevantes en tus documentos.
-- 🧠 Generación con LLM (modelo de lenguaje): genera una respuesta en lenguaje natural basándose en esos fragmentos.
+- 🔍 Recuperación de fragmentos relevantes desde tus documentos usando embeddings.
+- 🧠 Generación de respuestas con LLM (como GPT) usando ese contexto como referencia.
 
 ---
 
-## 🛠️ Requisitos previos
+## 🗂️ Estructura del proyecto
 
-- Python 3.10+  
-- Cuenta en [OpenAI](https://platform.openai.com/) y una API key válida.
-- Editor de texto (VS Code recomendado).
-- Conexión a Internet para las llamadas a OpenAI.
-
----
-
-## 📦 Instalación paso a paso
-
-1. **Clona este repositorio y entra en el proyecto**
-
-```bash
-git clone https://github.com/tu_usuario/tu_repo.git
-cd rag-project
+```
+langchain-rag-alice-chatbot/
+├── backend/
+│   ├── create_database.py
+│   ├── query_data.py
+│   ├── backend.py
+│   ├── chroma/                  ← base de datos vectorial
+│   ├── data/books/alice.md
+│   ├── requirements.txt
+│   └── .env
+├── frontend/
+│   ├── src/
+│   └── ...
+├── README.md
 ```
 
-2. **Crea y activa un entorno virtual**
+---
+
+## ⚙️ Instalación del Backend (Python)
+
+### 1. Entra en la carpeta del backend
+
+```bash
+cd backend
+```
+
+### 2. Crea entorno virtual
 
 ```bash
 python -m venv venv
-.env\Scriptsctivate   # En Windows
-source venv/bin/activate # En macOS/Linux
+.\venv\Scripts\activate
 ```
 
-3. **Instala las dependencias principales**
-
-> ⚠️ Si usas Windows y obtienes errores con `onnxruntime`, revisa más abajo los pasos específicos.
+### 3. Instala dependencias
 
 ```bash
 pip install -r requirements.txt
-```
-
-4. **Instala soporte para Markdown (muy importante para leer los `.md`)**
-
-```bash
 pip install "unstructured[md]"
 ```
 
-5. **Crea un archivo `.env` y añade tu clave de OpenAI:**
+### 4. Añade tu API key
+
+Crea un archivo `.env`:
 
 ```
-OPENAI_API_KEY=sk-xxxxxx
+OPENAI_API_KEY=sk-xxxxx
 ```
 
 ---
 
-## 🪛 Posibles errores y soluciones
+## ▶️ Uso del Backend
 
-### ❌ `Permission denied` (en Windows)
-➡ Ejecuta `pip install` con `--no-cache-dir`:
-```bash
-pip install chromadb --no-cache-dir
-```
-
-### ❌ `ModuleNotFoundError: No module named 'unstructured'`
-➡ Instala con:
-```bash
-pip install "unstructured[md]"
-```
-
-### ❌ `LangChainDeprecationWarning: predict is deprecated`
-➡ Usa `.invoke()` en lugar de `.predict()` en tus scripts.
-
-### ❌ `libmagic is unavailable`
-➡ Es solo una advertencia. Puedes ignorarla, pero si quieres soporte completo en detección de archivos, instala `libmagic` manualmente (opcional).
-
----
-
-## 🧪 Uso del sistema
-
-### 1. Crear la base de datos vectorial (embedding + almacenamiento)
+### 1. Crear la base vectorial
 
 ```bash
 python create_database.py
 ```
 
-Esto divide el documento en chunks y los guarda como vectores en `chroma/`.
-
-### 2. Consultar a la IA con tu propia pregunta
+### 2. Probar en consola
 
 ```bash
 python query_data.py "How does Alice meet the Mad Hatter?"
 ```
 
----
-
-## 🌐 Integración con Frontend en React
-
-Si ya tienes un frontend con React (por ejemplo, un chat que use OpenAI), puedes conectar este backend RAG usando **FastAPI**.
-
-### Backend con FastAPI
-
-Instala FastAPI y Uvicorn:
-
-```bash
-pip install fastapi uvicorn
-```
-
-Crea un archivo `backend.py`:
-
-```python
-from fastapi import FastAPI
-from pydantic import BaseModel
-from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-
-app = FastAPI()
-
-class Question(BaseModel):
-    query: str
-
-CHROMA_PATH = "chroma"
-PROMPT_TEMPLATE = '''
-Answer the question using only the following context:
-
-{context}
-
----
-
-Question: {question}
-'''
-
-@app.post("/ask")
-async def ask_question(data: Question):
-    embedding_function = OpenAIEmbeddings()
-    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
-    results = db.similarity_search_with_relevance_scores(data.query, k=3)
-
-    if not results or results[0][1] < 0.7:
-        return {"answer": "No relevant information found."}
-
-    context = "\n\n---\n\n".join([doc.page_content for doc, _ in results])
-    prompt = ChatPromptTemplate.from_template(PROMPT_TEMPLATE).format(context=context, question=data.query)
-    model = ChatOpenAI()
-    response = model.invoke(prompt).content
-    return {"answer": response}
-```
-
-Lanza el backend:
+### 3. Levantar API con FastAPI
 
 ```bash
 uvicorn backend:app --reload
 ```
 
-### En tu frontend React:
+Visita: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-Haz una llamada al backend:
+---
+
+## 💻 Frontend en React
+
+### 1. Entra en la carpeta `frontend/`
+
+```bash
+cd ../frontend
+npm install
+```
+
+### 2. Ejecuta la app
+
+```bash
+npm run dev
+```
+
+> Asegúrate de que el backend está corriendo en `http://localhost:8000`.
+
+### 3. Cómo funciona
+
+Tu componente React hace una petición POST al backend:
 
 ```js
 const response = await fetch("http://localhost:8000/ask", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ query: "Your user question" })
+  body: JSON.stringify({ query: "Your question" })
 });
-
 const data = await response.json();
 console.log(data.answer);
 ```
 
 ---
 
-## 📁 Estructura esperada del proyecto
+## 📹 Basado en:
 
-```
-rag-project/
-├── chroma/                    ← base de datos vectorial
-├── data/
-│   └── books/
-│       └── alice_in_wonderland.md
-├── .env
-├── create_database.py
-├── query_data.py
-├── compare_embeddings.py
-├── backend.py
-├── requirements.txt
-└── README.md
-```
+🎥 [Tutorial original de RAG + LangChain - por Pixegami](https://www.youtube.com/watch?v=tcqEUSNCn8I)
 
 ---
 
-## 📹 Tutorial original en video
+## 🙌 Créditos
 
-Basado en este excelente tutorial:  
-🎥 [RAG + Langchain Python Project - YouTube](https://www.youtube.com/watch?v=tcqEUSNCn8I)
+Proyecto extendido por **Oscar**.  
+Incluye mejoras de integración full-stack, gestión moderna de dependencias, y soporte para frontend personalizado con React.
 
----
-
-## ✅ Créditos y mejoras
-
-Proyecto extendido por Oscar con mejoras de compatibilidad, corrección de deprecaciones, conexión con frontend y documentación clara.  
-¡Listo para usar en tus propios documentos, manuales, libros o FAQs!
